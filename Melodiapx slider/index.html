@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Brand Carousel — Fixed Animations & No Jitter</title>
+  <style>
+    /* baseline */
+    * { box-sizing: border-box; }
+    html,body { height:100%; }
+    body {
+      margin: 0;
+      font-family: Arial, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: #fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+    }
+
+    .carousel {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      width:90%;
+      max-width:1100px;
+      position:relative;
+      padding: 8px 0;
+    }
+
+    /* scroll area */
+    .cards-wrapper {
+      display:flex;
+      gap:12px;
+      overflow-x: auto;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      padding: 65px 15px;
+      scrollbar-width: none;
+      z-index:1;
+    }
+    .cards-wrapper::-webkit-scrollbar { display:none; }
+
+    /* card (outer) — fixed size, border reserved to avoid layout changes */
+    .card {
+      --rotation: 0deg;              /* controlled by JS on hover */
+      flex: 0 0 auto;
+      width: 100px;
+      height: 100px;
+      background: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;             /* inner scaling won't change layout */
+      position: relative;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      border: 2px solid transparent; /* same border width always to prevent reflow */
+      transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, filter 220ms ease;
+      z-index: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* When hovered make it visually pop, but do NOT change outer size */
+    .card:hover {
+      z-index: 12; /* float above neighbors */
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.18);
+      filter: brightness(1.06);
+    }
+
+    /* inner wrapper handles rotation (uses --rotation from .card) */
+    .card-inner {
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transform-origin: center center;
+      transform: rotate(var(--rotation)); /* rotation applied here */
+      transition: transform 320ms cubic-bezier(.2,1,.3,1);
+      will-change: transform;
+      pointer-events: none; /* allow anchor to receive clicks */
+    }
+
+    /* content wrapper handles the pulsing / scaling animation
+       scaling this element does not change outer box size (overflow:hidden) */
+    .card-content {
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      transition: transform 320ms cubic-bezier(.2,1,.3,1);
+      will-change: transform;
+      animation: idlePulse 2400ms ease-in-out infinite;
+    }
+
+    /* tiny idle pulse (subtle) */
+    @keyframes idlePulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    /* stronger hover pulse (restores your original bigger pulse) */
+    @keyframes hoverPulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.09); }
+      100% { transform: scale(1); }
+    }
+
+    /* when hovered, switch animation to the stronger pulse */
+    .card:hover .card-content {
+      animation: hoverPulse 1600ms ease-in-out infinite;
+    }
+
+    /* image + label */
+    .card img {
+      max-width: 75%;
+      max-height: 75%;
+      object-fit: contain;
+      transition: transform 250ms ease;
+      pointer-events: none;
+      display:block;
+    }
+    .card:hover img { transform: scale(1.12); }
+
+    .card span {
+      position:absolute;
+      bottom:7px;
+      font-size:0.65rem;
+      font-weight:600;
+      color:#fff;
+      background: rgba(0,0,0,0.28);
+      padding:3px 6px;
+      border-radius:18px;
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.14);
+      opacity:0;
+      transform: translateY(0);
+      transition: opacity 220ms ease, transform 220ms ease;
+      pointer-events: none;
+    }
+    .card:hover span { opacity:1; transform: translateY(-6px); }
+
+    /* brand glow variants (kept from your list, slightly simplified for perf) */
+    .brand-nike:hover       { box-shadow: 0 8px 30px rgba(148,4,4,0.35); }
+    .brand-adidas:hover     { box-shadow: 0 8px 30px rgba(0,153,255,0.28); }
+    .brand-diverse:hover    { box-shadow: 0 8px 30px rgba(78,141,43,0.28); }
+    .brand-puma:hover       { box-shadow: 0 8px 30px rgba(255,100,0,0.28); }
+    .brand-medicine:hover   { box-shadow: 0 8px 30px rgba(128,0,128,0.28); }
+    .brand-reebok:hover     { box-shadow: 0 8px 30px rgba(0,255,200,0.28); }
+    .brand-underarmour:hover{ box-shadow: 0 8px 30px rgba(20,52,255,0.28); }
+    .brand-newbalance:hover { box-shadow: 0 8px 30px rgba(255,0,100,0.28); }
+    .brand-bejo:hover       { box-shadow: 0 8px 30px rgba(30,179,154,0.28); }
+    .brand-martes:hover     { box-shadow: 0 8px 30px rgba(80,120,20,0.28); }
+    .brand-iq:hover         { box-shadow: 0 8px 30px rgba(0,0,0,0.28); }
+    .brand-hitec:hover      { box-shadow: 0 8px 30px rgba(116,17,116,0.28); }
+    .brand-iguana:hover     { box-shadow: 0 8px 30px rgba(0,42,227,0.28); }
+    .brand-elbrus:hover     { box-shadow: 0 8px 30px rgba(161,225,122,0.28); }
+    .brand-aquawave:hover   { box-shadow: 0 8px 30px rgba(28,245,241,0.28); }
+    .brand-brugi:hover      { box-shadow: 0 8px 30px rgba(143,90,12,0.28); }
+    .brand-magnum:hover     { box-shadow: 0 8px 30px rgba(47,47,47,0.6); }
+    .brand-radvik:hover     { box-shadow: 0 8px 30px rgba(122,7,7,0.28); }
+    .brand-grisport:hover   { box-shadow: 0 8px 30px rgba(29,255,48,0.28); }
+    .brand-planika:hover    { box-shadow: 0 8px 30px rgba(29,255,48,0.28); }
+    .brand-coolslide:hover  { box-shadow: 0 8px 30px rgba(13,59,242,0.28); }
+
+    /* arrows */
+    .arrow {
+      font-size: 2.2rem;
+      color:#666;
+      user-select:none;
+      cursor:pointer;
+      transition: transform 200ms ease, color 200ms ease;
+      flex-shrink:0;
+      z-index: 5;
+    }
+    .arrow:hover { transform: scale(1.18); color:#000; }
+
+    /* progress bar */
+    .scroll-progress-container {
+      position:absolute;
+      bottom:10px;
+      left:10px;
+      right:10px;
+      height:5px;
+      background: rgba(0,0,0,0.06);
+      border-radius: 999px;
+      overflow:hidden;
+      z-index:2;
+    }
+    .scroll-progress-bar {
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg,#0f119c,#8adc3d);
+      border-radius:10px;
+      transition: width 350ms ease-out;
+    }
+
+    @media (max-width:600px) {
+      .card { width:70px; height:70px; border-width:1px; }
+      .arrow { font-size: 1.6rem; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="carousel" role="region" aria-label="Brand carousel">
+    <div class="arrow" id="left" aria-hidden="true">&#10094;</div>
+
+    <div class="cards-wrapper" id="cards">
+      <!-- All 22 cards (exact same links you had) -->
+      <a href="https://www.melodiapx.com/nike/" target="_blank" class="card brand-nike" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Nike.png" alt="Nike"><span>Nike</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/medicine/" target="_blank" class="card brand-medicine" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Medicine.png" alt="Medicine"><span>Medicine</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/adidas/" target="_blank" class="card brand-adidas" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Adidas.png" alt="Adidas"><span>Adidas</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/diverse/" target="_blank" class="card brand-diverse" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/diverse_logo_f.png" alt="Diverse"><span>Diverse</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/puma/" target="_blank" class="card brand-puma" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Puma.png" alt="Puma"><span>Puma</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/new-balance/" target="_blank" class="card brand-newbalance" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/New-Balance.png" alt="New Balance"><span>New Balance</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/reebok/" target="_blank" class="card brand-reebok" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Reebok.png" alt="Reebok"><span>Reebok</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/under-armour/" target="_blank" class="card brand-underarmour" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Under-Armour.png" alt="Under Armour"><span>Under Armour</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/bejo-sq-2/" target="_blank" class="card brand-bejo" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Bejo.png" alt="Bejo"><span>Bejo</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/martes-sq-2/" target="_blank" class="card brand-martes" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Martes.png" alt="Martes"><span>Martes</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/iq-sq-2/" target="_blank" class="card brand-iq" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/IQ.png" alt="IQ"><span>IQ</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/hi-tec/" target="_blank" class="card brand-hitec" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Hi-Tec.png" alt="Hi-Tec"><span>Hi-Tec</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/iguana/" target="_blank" class="card brand-iguana" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Iguana.png" alt="Iguana"><span>Iguana</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/elbrus/" target="_blank" class="card brand-elbrus" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Elbrus.png" alt="Elbrus"><span>Elbrus</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/aquawave/" target="_blank" class="card brand-aquawave" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Aqua-Wave.png" alt="Aquawave"><span>Aquawave</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/brugi/" target="_blank" class="card brand-brugi" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Brugi.png" alt="Brugi"><span>Brugi</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/magnum/" target="_blank" class="card brand-magnum" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Magnum.png" alt="Magnum"><span>Magnum</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/radvik/" target="_blank" class="card brand-radvik" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Radvik.png" alt="Radvik"><span>Radvik</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/grisport/" target="_blank" class="card brand-grisport" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Grisport.png" alt="Grisport"><span>Grisport</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/planika/" target="_blank" class="card brand-planika" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Planika.png" alt="Planika"><span>Planika</span></div></div>
+      </a>
+
+      <a href="https://www.melodiapx.com/cool-slide/" target="_blank" class="card brand-coolslide" rel="noopener">
+        <div class="card-inner"><div class="card-content"><img src="https://www.melodiapx.com/cdn/Cool-Slide.png" alt="Coolslide"><span>Coolslide</span></div></div>
+      </a>
+    </div>
+
+    <div class="scroll-progress-container" aria-hidden="true">
+      <div id="progressBar" class="scroll-progress-bar"></div>
+    </div>
+
+    <div class="arrow" id="right" aria-hidden="true">&#10095;</div>
+  </div>
+
+  <script>
+    // elements
+    const cards = document.getElementById('cards');
+    const left = document.getElementById('left');
+    const right = document.getElementById('right');
+    const progressBar = document.getElementById('progressBar');
+    const scrollAmount = 200;
+
+    // arrows
+    left?.addEventListener('click', () => {
+      cards.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+    });
+    right?.addEventListener('click', () => {
+      cards.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    });
+
+    // touch swipe (simple)
+    let startX = 0;
+    cards.addEventListener('touchstart', e => startX = e.touches[0].clientX, {passive:true});
+    cards.addEventListener('touchend', e => {
+      const diff = startX - e.changedTouches[0].clientX;
+      if (Math.abs(diff) > 50) cards.scrollBy({ left: diff > 0 ? scrollAmount : -scrollAmount, behavior: 'smooth' });
+    }, {passive:true});
+
+    // progress bar update (guard when wrapper is empty)
+    function updateProgressBar() {
+      const scrollLeft = cards.scrollLeft || 0;
+      const maxScroll = Math.max(0, cards.scrollWidth - cards.clientWidth);
+      const pct = maxScroll === 0 ? 0 : (scrollLeft / maxScroll) * 100;
+      progressBar.style.width = pct + '%';
+    }
+    cards.addEventListener('scroll', updateProgressBar);
+    updateProgressBar();
+
+    // restore rotation interaction & prevent jitter:
+    // - set --rotation CSS var on the .card (inherited by its .card-inner)
+    // - rotation is only a rotate transform on the inner wrapper (no outer size change)
+    document.querySelectorAll('.card').forEach(card => {
+      // small rotate angle for hover
+      const hoverAngle = '4.5deg';
+      card.addEventListener('mouseenter', () => {
+        card.style.setProperty('--rotation', hoverAngle);
+        // also bump z-index so it appears above neighbors while animating
+        card.style.zIndex = 20;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.setProperty('--rotation', '0deg');
+        card.style.zIndex = '';
+      });
+
+      // keyboard accessibility: when focused (tab) show rotation too
+      card.addEventListener('focus', () => {
+        card.style.setProperty('--rotation', hoverAngle);
+        card.style.zIndex = 20;
+      });
+      card.addEventListener('blur', () => {
+        card.style.setProperty('--rotation', '0deg');
+        card.style.zIndex = '';
+      });
+    });
+
+    // initial safety: if window resizes, refresh progress
+    window.addEventListener('resize', updateProgressBar);
+  </script>
+</body>
+</html>
